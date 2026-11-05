@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SkyScreen | Breast cancer network demo</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%230369a1'/%3E%3Cpath d='M8 17h4l2-5 4 9 2-4h4' fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="15" fill="#0369a1"/><path d="M8 17h4l2-5 4 9 2-4h4" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div>
+        <h1>SkyScreen</h1>
+        <p>Breast cancer network, running on your computer</p>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Sections">
+      <button role="tab" id="t-single" aria-controls="tab-single" aria-selected="true">Single patient</button>
+      <button role="tab" id="t-batch" aria-controls="tab-batch" aria-selected="false">Batch CSV</button>
+      <button role="tab" id="t-about" aria-controls="tab-about" aria-selected="false">About</button>
+    </nav>
+    <span class="pill" id="model-pill" hidden></span>
+  </div>
+</header>
+
+<div class="banner">Teaching model. Not for medical decisions. Please do not enter real patient data.</div>
+
+<main>
+  <noscript><p class="notice">This page needs JavaScript to run.</p></noscript>
+  <div id="version-warning" class="notice danger" role="alert" hidden></div>
+  <div id="fatal" class="notice danger" role="alert" hidden></div>
+
+  <!-- ===================== SINGLE PATIENT ===================== -->
+  <section id="tab-single" role="tabpanel" aria-labelledby="t-single">
+    <div class="split">
+      <div class="card">
+        <div class="card-head">
+          <h2>Measurements</h2>
+          <p class="muted">Fill in the 30 values, load an example, or upload a one-patient CSV.</p>
+        </div>
+
+        <div class="toolbar">
+          <label class="field-inline">
+            <span>Example</span>
+            <select id="example-select"><option value="">Choose...</option></select>
+          </label>
+          <label class="btn ghost file-btn">Upload CSV<input type="file" id="single-file" accept=".csv,text/csv"></label>
+          <button type="button" class="btn ghost" id="clear">Clear</button>
+        </div>
+
+        <form id="form" novalidate>
+          <div id="groups"></div>
+          <p id="form-error" class="notice danger" role="alert" hidden></p>
+          <div class="form-actions">
+            <button type="submit" class="btn primary" id="predict">Predict</button>
+            <span class="muted small">Units follow the original dataset. Hover a box to see the typical range.</span>
+          </div>
+        </form>
+      </div>
+
+      <aside class="side">
+        <section class="card result-card" aria-live="polite">
+          <div class="card-head row">
+            <h2>Result</h2>
+            <div class="row gap">
+              <button type="button" class="btn ghost sm" id="copy" hidden>Copy summary</button>
+              <button type="button" class="btn ghost sm" id="print" hidden>Print</button>
+            </div>
+          </div>
+          <div id="result-empty" class="empty">
+            <svg viewBox="0 0 120 70" aria-hidden="true"><path d="M10 62A50 50 0 0 1 110 62" fill="none" stroke="#bae6fd" stroke-width="10" stroke-linecap="round"/><path d="M60 62l22-30" stroke="#0369a1" stroke-width="3" stroke-linecap="round"/><circle cx="60" cy="62" r="5" fill="#0369a1"/></svg>
+            <p>Your result will appear here.</p>
+          </div>
+          <div id="result" hidden></div>
+
+          <div class="threshold">
+            <label for="threshold">Decision threshold: <strong id="threshold-value">50%</strong></label>
+            <input type="range" id="threshold" min="10" max="90" step="5" value="50">
+            <p class="muted small">At or above this probability the result is called malignant. Lower it to catch more cases (more false alarms); raise it for fewer false alarms (more misses).</p>
+          </div>
+        </section>
+
+        <section class="card" id="history-card" hidden>
+          <div class="card-head row">
+            <h2>This session</h2>
+            <button type="button" class="btn ghost sm" id="history-clear">Clear list</button>
+          </div>
+          <ul id="history" class="history"></ul>
+          <p class="muted small">Kept in this browser tab only. Closing or refreshing the page erases it.</p>
+        </section>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ===================== BATCH ===================== -->
+  <section id="tab-batch" role="tabpanel" aria-labelledby="t-batch" hidden>
+    <div class="card">
+      <div class="card-head row">
+        <div>
+          <h2>Score many patients</h2>
+          <p class="muted">One patient per row, with a header row containing the 30 measurement names. Extra columns are ignored; a column named <code>patient_id</code> or <code>id</code> is shown in the results.</p>
+        </div>
+        <button type="button" class="btn ghost" id="template">Download template</button>
+      </div>
+
+      <label class="drop" id="drop" for="batch-file">
+        <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 34V14m0 0l-8 8m8-8l8 8" fill="none" stroke="#0369a1" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 34v4a4 4 0 004 4h24a4 4 0 004-4v-4" fill="none" stroke="#7dd3fc" stroke-width="3" stroke-linecap="round"/></svg>
+        <strong>Drop a CSV file here</strong>
+        <span>or click to choose one (up to <span id="max-rows">1000</span> patients, 1 MB)</span>
+        <input type="file" id="batch-file" accept=".csv,text/csv">
+      </label>
+      <p id="batch-error" class="notice danger" role="alert" hidden></p>
+    </div>
+
+    <div id="batch-results" hidden>
+      <div class="stats" id="stats"></div>
+      <div class="card">
+        <div class="card-head row">
+          <h2 id="batch-title">Results</h2>
+          <div class="row gap wrap">
+            <label class="field-inline"><span>Show</span>
+              <select id="filter">
+                <option value="all">All rows</option>
+                <option value="malignant">Malignant only</option>
+                <option value="benign">Benign only</option>
+                <option value="invalid">Problems only</option>
+              </select>
+            </label>
+            <label class="field-inline"><span>Sort</span>
+              <select id="sort">
+                <option value="row">File order</option>
+                <option value="high">Highest probability first</option>
+                <option value="low">Lowest probability first</option>
+              </select>
+            </label>
+            <button type="button" class="btn primary sm" id="download">Download results</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Row</th><th>Patient</th><th>Probability of malignant</th><th>Result</th><th>Notes</th></tr></thead>
+            <tbody id="batch-body"></tbody>
+          </table>
+        </div>
+        <p class="muted small" id="batch-note"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== ABOUT ===================== -->
+  <section id="tab-about" role="tabpanel" aria-labelledby="t-about" hidden>
+    <div class="grid-2">
+      <div class="card">
+        <h2>About this model</h2>
+        <dl class="facts" id="facts"></dl>
+        <p class="muted small">The network was trained on a small public benchmark dataset of 569 patients. It reads 30 numbers measured from a digitised image of a cell sample and returns a probability. It was never tested on real clinical work.</p>
+      </div>
+      <div class="card">
+        <h2>How to read a result</h2>
+        <ul class="plain">
+          <li><strong>Probability</strong> is the network's confidence that the sample is malignant, from 0% to 100%.</li>
+          <li><strong>Threshold</strong> turns that probability into a label. The tick on the gauge shows where it sits.</li>
+          <li><strong>What influenced this result</strong> swaps each measurement for the training average and shows how far the result moves, longest bar first. It is an approximation, because the measurements are related.</li>
+          <li><strong>Warnings</strong> appear when a value is far outside anything the model learned from, which usually means a unit mistake.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h2>Safety</h2>
+        <ul class="plain">
+          <li>Not for diagnosis, screening or any medical decision.</li>
+          <li>Everything runs on this computer. Nothing is sent anywhere, and no history is stored.</li>
+          <li>Keep the default address (127.0.0.1). Never expose this page to other computers: it has no password.</li>
+          <li>Do not type or upload real patient records.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h2>For developers</h2>
+        <p>The same model is available as an API. Interactive docs: <a href="/docs">/docs</a></p>
+        <table class="mini">
+          <tr><td><code>GET /api/model-info</code></td><td>Features, ranges, versions</td></tr>
+          <tr><td><code>POST /api/predict</code></td><td>JSON with 30 values</td></tr>
+          <tr><td><code>POST /api/predict/csv</code></td><td>One-patient CSV text</td></tr>
+          <tr><td><code>POST /api/predict/batch</code></td><td>Many-patient CSV text</td></tr>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p id="footer-line">SkyScreen runs entirely on your computer.</p>
+</footer>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+# Only used for the built-in demo model (run.bat / run.sh pick this when there is no Colab requirements.txt)
+scikit-learn
+pandas
+numpy
+joblib
